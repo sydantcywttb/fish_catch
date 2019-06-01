@@ -1,0 +1,265 @@
+<?php
+
+function fish_catch_block_info()
+{
+	$blocks['fish_catch'] = array(
+		'info'  => t('Fish catch'),
+		'cache' => DRUPAL_CACHE_PER_ROLE, // по умолчанию
+	);
+
+	return $blocks;
+}
+
+function fish_catch_menu()
+{
+
+	$items = array();
+
+	// список катеров
+	$items['admin/config/content/fish_catch'] = array(
+		'title'            => 'Катеры',
+		'description'      => 'Configure the fish catch.',
+		'page callback'    => 'fish_list',
+		'access arguments' => array('administer site configuration'),
+	);
+    // добавление рейса
+    $items['admin/config/content/fish_catch/cruise/add'] = array(
+        'title'            => 'Добавить ленту',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_catch_cruise_add'),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 2,
+    );
+
+
+
+
+	$items['fish_catch'] = array(
+		'title'            => 'RSS feeds',
+		'page callback'    => '_fish_catch_page',
+		'access arguments' => array('access content'),
+	);
+	
+
+	$items['fish_catch/%fish/items'] = array(
+		'title'            => 'RSS feed content',
+		'page callback'    => 'fish_content',
+		'page arguments'   => array(1),
+		'access callback'  => TRUE,
+		'access arguments' => array('access content'),
+		'type'             => MENU_CALLBACK,
+	);
+
+
+	return $items;
+}
+
+
+
+
+function fish_list()
+{
+	$header = array(
+		array('data' => t('Name')),
+		array('data' => t('Release_date')),
+		array('data' => t('Fishes'))
+	);
+
+    $query = db_query("SELECT c.passport_id, c.release_date, p.name, 
+          (SELECT COUNT(f.fish_id) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
+          FROM {passport} AS p, {cruise} AS c WHERE p.passport_id = c.passport_id", array());
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->release_date),
+                array('data' => $item->count),
+            );
+        }
+    }
+
+	return theme('table', array(
+		'header' => $header,
+		'rows'   => $row,
+	));
+}
+
+
+
+// гавнокод
+
+
+// добавление рейса
+function fish_catch_cruise_form($form, &$form_state, $rss_customers = null)
+{
+
+    if($rss_customers) {
+
+        $rss_customers = db_select('customers', 'n')
+            ->fields('n', array('custno', 'custname', 'city'))
+            ->condition('n.custno', $rss_customers)
+            ->execute()->fetchAssoc();
+    }
+    $form['custname'] = array(
+        '#title'         => t('Client custname'),
+        '#description'   => t('Insert client custname'),
+        '#type'          => 'textfield',
+        '#default_value' => $rss_customers ? $rss_customers['custname'] : '',
+        '#required'      => true,
+    );
+    $form['city'] = array(
+        '#title'         => t('City'),
+        '#description'   => t('Insert client city'),
+        '#type'          => 'textfield',
+        '#default_value' => $rss_customers ? $rss_customers['city'] : '',
+        '#required'      => true,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => $rss_customers ? t('Save') : t('Add'),
+    );
+
+    if ($rss_customers) {
+        $form['custno'] = array(
+            '#type'  => 'value',
+            '#value' => $rss_customers['custno'],
+        );
+    }
+    return $form;
+}
+
+function fish_catch_cruise_form_validate($form, &$form_state)
+{
+
+}
+
+function fish_catch_cruise_form_submit($form, &$form_state)
+{
+    $rss_customers = array(
+        'custname' => $form_state['values']['custname'],
+        'city' => $form_state['values']['city'],
+    );
+
+    // save edit data
+    if (isset($form_state['values']['custno'])) {
+        $rss_customers['custno'] = $form_state['values']['custno'];
+        drupal_write_record('customers', $rss_customers, 'custno');
+        drupal_set_message(t('customers saved!'));
+    } // add new data
+    else {
+        drupal_write_record('customers', $rss_customers);
+        drupal_set_message(t('customers added!'));
+    }
+
+    drupal_goto('admin/config/content/rss_feeds/customers_list');
+}
+
+
+
+
+
+function fish_contents($display)
+{
+	$query = db_select('fishfeeds', 'n')
+		->fields('n', array('id', 'name', 'url'))
+		->orderBy('name', 'DESC');
+
+	if ($display == 'block') {
+		$query->range(0, 5);
+	}
+
+	return $query->execute();
+}
+
+
+
+
+function fish_catch_block_view($delta = '')
+{
+	$blocks = array();
+	switch ($delta) {
+		case 'fish_catch':
+			$select = db_select('fishfeeds', 'tc');
+			$select->addField('tc', 'name');
+			$select->addField('tc', 'url');
+
+			$entries = $select->execute()->fetchAll();
+
+			$blocks['subject'] = t('List of URLs');
+			$blocks['content'] = theme('fishfeeds_block', array('urls' => $entries));
+	}
+
+	return $blocks;
+}
+
+function _fish_catch_page()
+{
+	drupal_set_title(t('RSS Feeds'));
+
+	$result = fish_contents('page')->fetchAll();
+
+	if (!$result) {
+		$page_array['fish_catch_arguments'] = array(
+			'#title'  => t('RSS Feeds page'),
+			'#markup' => t('No RSS feeds available'),
+		);
+
+		return $page_array;
+	} else {
+		$page_array = theme('fishfeeds_page', array('urls' => $result));
+
+		return $page_array;
+	}
+}
+
+function fish_content($fish)
+{
+	$url = $fish['url'];
+
+	libxml_use_internal_errors(true);
+	$fish_feed = simplexml_load_file($url);
+	if (!empty($fish_feed)) {
+		drupal_set_title($fish_feed->channel->title);
+		$page_array = theme('fishfeeds_content', array('items' => $fish_feed));
+
+		return $page_array;
+	} else {
+		$page_array['fish_catch_arguments'] = array(
+			'#title'  => t('All posts from the last week'),
+			'#markup' => t('No posts available.'),
+		);
+
+		return $page_array;
+	}
+}
+
+function fish_catch_theme()
+{
+	return array(
+		'fishfeeds_block'   => array(
+			'variables' => array(
+				'urls' => NULL
+			),
+			'template'  => 'fishfeeds-block',
+		),
+		'fishfeeds_page'    => array(
+			'variables' => array(
+				'urls' => NULL
+			),
+			'template'  => 'fishfeeds-page',
+		),
+		'fishfeeds_content' => array(
+			'variables' => array(
+				'items' => NULL
+			),
+			'template'  => 'fishfeeds-content',
+		)
+	);
+}

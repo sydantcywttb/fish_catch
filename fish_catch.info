@@ -1,0 +1,9 @@
+name = Рыболовная фирма
+description = Управляет информацией
+package = «FISH»
+core = 7.x
+version = «7.x-1.0»
+configure = admin/config/content/fish_catch
+files[]= fish_catch.module
+stylesheets[all][] = main.css
+scripts[] = main.js

@@ -1,0 +1,89 @@
+<?php
+function fish_catch_uninstall()
+{
+    cache_clear_all('fish_catch', 'cache', TRUE);
+    drupal_uninstall_schema('fishcatch');
+    menu_rebuild();
+}
+
+function fish_catch_schema()
+{
+
+    // Паспорт катера
+    $schema['passport'] = array(
+        'fields'      => array(
+            'passport_id' => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'name'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'type'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'created_at' => array('type' => 'int', 'not null' => TRUE),
+            'water_size' => array('type' => 'int', 'not null' => TRUE),
+        ),
+        'primary key' => array('passport_id')
+    );
+
+
+    // Рейс, выход на лов
+    $schema['cruise'] = array(
+        'fields'      => array(
+            'cruise_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'passport_id' => array('type' => 'int', 'not null' => TRUE),
+            'release_date' => array('type' => 'int', 'not null' => TRUE),
+            'return_date' => array('type' => 'int', 'not null' => TRUE),
+        ),
+        'primary key' => array('cruise_id')
+    );
+
+    // Пойманная рыба
+    $schema['fish'] = array(
+        'fields'      => array(
+            'fish_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'sort'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'weight' => array('type' => 'int', 'not null' => TRUE),
+            'cruise_id' => array('type' => 'int', 'not null' => TRUE),
+        ),
+        'primary key' => array('fish_id')
+    );
+
+    // Член команды
+    $schema['crewman'] = array(
+        'fields'      => array(
+            'crewman_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'address'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'post'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+        ),
+        'primary key' => array('crewman_id')
+    );
+
+    // Команда рейса
+    $schema['cruise_team'] = array(
+        'fields'      => array(
+            'crewman_id'     => array('type' => 'int', 'not null' => TRUE),
+            'cruise_id'       => array('type' => 'int', 'not null' => TRUE),
+        ),
+    );
+
+    // Банка
+    $schema['bank'] = array(
+        'fields'      => array(
+            'bank_id'     => array('type' => 'int', 'not null' => TRUE),
+            'name'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'description'  => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+        ),
+        'primary key' => array('bank_id')
+    );
+
+    // Посещение банки
+    $schema['bank_visit'] = array(
+        'fields'      => array(
+            'visit_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'cruise_id'     => array('type' => 'int', 'not null' => TRUE),
+            'bank_id'     => array('type' => 'int', 'not null' => TRUE),
+            'arrival_date' => array('type' => 'int', 'not null' => TRUE),
+            'departure_date' => array('type' => 'int', 'not null' => TRUE),
+            'quality'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+        ),
+        'primary key' => array('visit_id')
+    );
+
+    return $schema;
+}
