@@ -15,55 +15,50 @@ function fish_catch_menu()
 
 	$items = array();
 
-	// список катеров
 	$items['admin/config/content/fish_catch'] = array(
-		'title'            => 'Катеры',
-		'description'      => 'Configure the fish catch.',
+		'title'            => 'Рыболовная фирма',
+		'description'      => 'Управление информацией.',
 		'page callback'    => 'fish_list',
 		'access arguments' => array('administer site configuration'),
 	);
+
+    // список катеров
+    $items['admin/config/content/fish_catch/list'] = array(
+        'title'  => 'Катеры',
+        'type'   => MENU_DEFAULT_LOCAL_TASK,
+        'weight' => 1,
+    );
     // добавление рейса
-    $items['admin/config/content/fish_catch/cruise/add'] = array(
-        'title'            => 'Добавить ленту',
+    $items['admin/config/content/fish_catch/passport/%passport_cruise/cruise'] = array(
+        'title'            => 'Добавить рейс',
         'page callback'    => 'drupal_get_form',
-        'page arguments'   => array('fish_catch_cruise_add'),
+        'page arguments'   => array('fish_catch_passport_cruise_form'),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // члены команды
+    $items['admin/config/content/fish_catch/crewman/list'] = array(
+        'title'            => 'Члены команды',
+        'page callback'    => 'fish_crewman_list',
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_LOCAL_TASK,
-        'weight'           => 2,
+        'weight'           => 3,
     );
 
 
-
-
-	$items['fish_catch'] = array(
-		'title'            => 'RSS feeds',
-		'page callback'    => '_fish_catch_page',
-		'access arguments' => array('access content'),
-	);
-	
-
-	$items['fish_catch/%fish/items'] = array(
-		'title'            => 'RSS feed content',
-		'page callback'    => 'fish_content',
-		'page arguments'   => array(1),
-		'access callback'  => TRUE,
-		'access arguments' => array('access content'),
-		'type'             => MENU_CALLBACK,
-	);
-
-
-	return $items;
+    return $items;
 }
 
 
 
-
+// список рейсов
 function fish_list()
 {
 	$header = array(
 		array('data' => t('Name')),
 		array('data' => t('Release_date')),
-		array('data' => t('Fishes'))
+		array('data' => t('Fishes')),
+		array('data' => t('Actions')),
 	);
 
     $query = db_query("SELECT c.passport_id, c.release_date, p.name, 
@@ -75,11 +70,16 @@ function fish_list()
 
     if($result) {
         foreach ($result as $item) {
+            $actions = array(
+                l(t('add cruise'), 'admin/config/content/fish_catch/passport/' . $item->passport_id . '/cruise'),
+            );
 
+            $date = date('d-m-Y', $item->release_date);
             $row [] = array(
                 array('data' => $item->name),
-                array('data' => $item->release_date),
+                array('data' => $date),
                 array('data' => $item->count),
+                array('data' => implode(' | ', $actions)),
             );
         }
     }
@@ -92,44 +92,104 @@ function fish_list()
 
 
 
-// гавнокод
+
 
 
 // добавление рейса
-function fish_catch_cruise_form($form, &$form_state, $rss_customers = null)
+function fish_catch_passport_cruise_form($form, &$form_state, $passport_cruise = null)
 {
 
-    if($rss_customers) {
-
-        $rss_customers = db_select('customers', 'n')
-            ->fields('n', array('custno', 'custname', 'city'))
-            ->condition('n.custno', $rss_customers)
-            ->execute()->fetchAssoc();
-    }
-    $form['custname'] = array(
-        '#title'         => t('Client custname'),
-        '#description'   => t('Insert client custname'),
+    $form['passport_id'] = array(
+        '#title'         => t('Passport id'),
+        '#description'   => t('Insert passport id'),
         '#type'          => 'textfield',
-        '#default_value' => $rss_customers ? $rss_customers['custname'] : '',
+        '#default_value' => $passport_cruise ? $passport_cruise : '',
         '#required'      => true,
     );
-    $form['city'] = array(
-        '#title'         => t('City'),
-        '#description'   => t('Insert client city'),
+    $form['release_date'] = array(
+        '#title'         => t('Release date'),
+        '#description'   => t('Release date 22-03-2018'),
         '#type'          => 'textfield',
-        '#default_value' => $rss_customers ? $rss_customers['city'] : '',
+        '#default_value' => '',
         '#required'      => true,
+    );
+    $form['return_date'] = array(
+        '#title'         => t('Return date'),
+        '#description'   => t('Return date 22-03-2018'),
+        '#type'          => 'textfield',
+        '#default_value' => '',
+        '#required'      => false,
     );
 
     $form['submit'] = array(
         '#type'  => 'submit',
-        '#value' => $rss_customers ? t('Save') : t('Add'),
+        '#value' => $passport_cruise ? t('Save') : t('Add'),
     );
 
-    if ($rss_customers) {
-        $form['custno'] = array(
+    return $form;
+}
+
+function fish_catch_passport_cruise_form_validate($form, &$form_state)
+{
+
+}
+
+function fish_catch_passport_cruise_form_submit($form, &$form_state)
+{
+    $addData = array(
+        'passport_id' => $form_state['values']['passport_id'],
+        'release_date' => $form_state['values']['release_date'],
+        'return_date' => $form_state['values']['return_date'],
+    );
+
+    // formating date to int
+    $addData['release_date'] = strtotime($addData['release_date']);
+    $addData['return_date'] = strtotime($addData['return_date']);
+
+    drupal_write_record('cruise', $addData);
+    drupal_set_message(t('cruise added!'));
+
+    drupal_goto('admin/config/content/fish_catch');
+}
+
+
+
+
+// редактирование рейса
+function fish_catch_cruise_form($form, &$form_state, $cruise_info = null)
+{
+
+    $form['passport_id'] = array(
+        '#title'         => t('Passport id'),
+        '#description'   => t('Insert passport id'),
+        '#type'          => 'textfield',
+        '#default_value' => $cruise_info ? $cruise_info['passport_id'] : '',
+        '#required'      => true,
+    );
+    $form['release_date'] = array(
+        '#title'         => t('Release date'),
+        '#description'   => t('Release date 22-03-2018'),
+        '#type'          => 'textfield',
+        '#default_value' => $cruise_info ? date('d-m-Y', $cruise_info['release_date']) : '',
+        '#required'      => true,
+    );
+    $form['return_date'] = array(
+        '#title'         => t('Return date'),
+        '#description'   => t('Return date 22-03-2018'),
+        '#type'          => 'textfield',
+        '#default_value' => $cruise_info ? date('d-m-Y', $cruise_info['return_date']) : '',
+        '#required'      => false,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => $cruise_info ? t('Save') : t('Add'),
+    );
+
+    if ($cruise_info) {
+        $form['cruise_id'] = array(
             '#type'  => 'value',
-            '#value' => $rss_customers['custno'],
+            '#value' => $cruise_info['cruise_id'],
         );
     }
     return $form;
@@ -142,124 +202,77 @@ function fish_catch_cruise_form_validate($form, &$form_state)
 
 function fish_catch_cruise_form_submit($form, &$form_state)
 {
-    $rss_customers = array(
-        'custname' => $form_state['values']['custname'],
-        'city' => $form_state['values']['city'],
+    $addData = array(
+        'passport_id' => $form_state['values']['passport_id'],
+        'release_date' => $form_state['values']['release_date'],
+        'return_date' => $form_state['values']['return_date'],
     );
 
+    // formating date to int
+    $addData['release_date'] = strtotime($addData['release_date']);
+    $addData['return_date'] = strtotime($addData['return_date']);
+
     // save edit data
-    if (isset($form_state['values']['custno'])) {
-        $rss_customers['custno'] = $form_state['values']['custno'];
-        drupal_write_record('customers', $rss_customers, 'custno');
-        drupal_set_message(t('customers saved!'));
+    if (isset($form_state['values']['cruise_id'])) {
+        $addData['cruise_id'] = $form_state['values']['cruise_id'];
+        drupal_write_record('cruise', $addData, 'cruise_id');
+        drupal_set_message(t('cruise saved!'));
     } // add new data
     else {
-        drupal_write_record('customers', $rss_customers);
-        drupal_set_message(t('customers added!'));
+        drupal_write_record('cruise', $addData);
+        drupal_set_message(t('cruise added!'));
     }
 
-    drupal_goto('admin/config/content/rss_feeds/customers_list');
+    drupal_goto('admin/config/content/fish_catch');
+}
+
+
+function cruise_info_load($id)
+{
+    $cruise_info = db_select('cruise', 'n')
+        ->fields('n', array('cruise_id', 'passport_id', 'release_date', 'return_date'))
+        ->condition('n.cruise_id', $id)
+        ->execute()->fetchAssoc();
+
+    return $cruise_info;
 }
 
 
 
 
 
-function fish_contents($display)
+// члены команды
+function fish_crewman_list()
 {
-	$query = db_select('fishfeeds', 'n')
-		->fields('n', array('id', 'name', 'url'))
-		->orderBy('name', 'DESC');
+    $header = array(
+        array('data' => t('Name')),
+        array('data' => t('Post')),
+        array('data' => t('Address')),
+        array('data' => t('Actions'))
+    );
 
-	if ($display == 'block') {
-		$query->range(0, 5);
-	}
+    $query = db_query("SELECT * FROM {crewman}", array());
+    $result = $query->fetchAll();
 
-	return $query->execute();
-}
+    $row = array();
 
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('add in cruiseteam'), 'admin/config/content/fish_catch/cruise_team/' . $item->crewman_id . '/crewman'),
+            );
 
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->address),
+                array('data' => $item->post),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
 
-
-function fish_catch_block_view($delta = '')
-{
-	$blocks = array();
-	switch ($delta) {
-		case 'fish_catch':
-			$select = db_select('fishfeeds', 'tc');
-			$select->addField('tc', 'name');
-			$select->addField('tc', 'url');
-
-			$entries = $select->execute()->fetchAll();
-
-			$blocks['subject'] = t('List of URLs');
-			$blocks['content'] = theme('fishfeeds_block', array('urls' => $entries));
-	}
-
-	return $blocks;
-}
-
-function _fish_catch_page()
-{
-	drupal_set_title(t('RSS Feeds'));
-
-	$result = fish_contents('page')->fetchAll();
-
-	if (!$result) {
-		$page_array['fish_catch_arguments'] = array(
-			'#title'  => t('RSS Feeds page'),
-			'#markup' => t('No RSS feeds available'),
-		);
-
-		return $page_array;
-	} else {
-		$page_array = theme('fishfeeds_page', array('urls' => $result));
-
-		return $page_array;
-	}
-}
-
-function fish_content($fish)
-{
-	$url = $fish['url'];
-
-	libxml_use_internal_errors(true);
-	$fish_feed = simplexml_load_file($url);
-	if (!empty($fish_feed)) {
-		drupal_set_title($fish_feed->channel->title);
-		$page_array = theme('fishfeeds_content', array('items' => $fish_feed));
-
-		return $page_array;
-	} else {
-		$page_array['fish_catch_arguments'] = array(
-			'#title'  => t('All posts from the last week'),
-			'#markup' => t('No posts available.'),
-		);
-
-		return $page_array;
-	}
-}
-
-function fish_catch_theme()
-{
-	return array(
-		'fishfeeds_block'   => array(
-			'variables' => array(
-				'urls' => NULL
-			),
-			'template'  => 'fishfeeds-block',
-		),
-		'fishfeeds_page'    => array(
-			'variables' => array(
-				'urls' => NULL
-			),
-			'template'  => 'fishfeeds-page',
-		),
-		'fishfeeds_content' => array(
-			'variables' => array(
-				'items' => NULL
-			),
-			'template'  => 'fishfeeds-content',
-		)
-	);
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
 }

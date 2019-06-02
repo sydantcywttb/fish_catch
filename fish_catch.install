@@ -48,6 +48,7 @@ function fish_catch_schema()
     $schema['crewman'] = array(
         'fields'      => array(
             'crewman_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'name'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
             'address'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
             'post'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
         ),
