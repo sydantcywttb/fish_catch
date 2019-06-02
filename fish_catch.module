@@ -32,7 +32,7 @@ function fish_catch_menu()
     $items['admin/config/content/fish_catch/passport/%passport_cruise/cruise'] = array(
         'title'            => 'Добавить рейс',
         'page callback'    => 'drupal_get_form',
-        'page arguments'   => array('fish_catch_passport_cruise_form'),
+        'page arguments'   => array('fish_catch_passport_cruise_form', 5),
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_CALLBACK,
     );
@@ -43,6 +43,14 @@ function fish_catch_menu()
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_LOCAL_TASK,
         'weight'           => 3,
+    );
+    // члены команды рейса
+    $items['admin/config/content/fish_catch/cruise/%cruise_crewteam/cruise_team'] = array(
+        'title'            => 'Члены команды',
+        'page arguments'   => array(5),
+        'page callback'    => 'fish_cruise_team_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
     );
 
 
@@ -61,7 +69,7 @@ function fish_list()
 		array('data' => t('Actions')),
 	);
 
-    $query = db_query("SELECT c.passport_id, c.release_date, p.name, 
+    $query = db_query("SELECT c.cruise_id, c.passport_id, c.release_date, p.name, 
           (SELECT COUNT(f.fish_id) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
           FROM {passport} AS p, {cruise} AS c WHERE p.passport_id = c.passport_id", array());
     $result = $query->fetchAll();
@@ -72,6 +80,7 @@ function fish_list()
         foreach ($result as $item) {
             $actions = array(
                 l(t('add cruise'), 'admin/config/content/fish_catch/passport/' . $item->passport_id . '/cruise'),
+                l(t('crewmans'), 'admin/config/content/fish_catch/cruise/' . $item->cruise_id . '/cruise_team'),
             );
 
             $date = date('d-m-Y', $item->release_date);
@@ -260,6 +269,50 @@ function fish_crewman_list()
         foreach ($result as $item) {
             $actions = array(
                 l(t('add in cruiseteam'), 'admin/config/content/fish_catch/cruise_team/' . $item->crewman_id . '/crewman'),
+            );
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->address),
+                array('data' => $item->post),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
+
+
+
+// члены команды рейса
+function fish_cruise_team_list($cruise_crewteam)
+{
+    print_r($cruise_crewteam);
+
+    $header = array(
+        array('data' => t('Name')),
+        array('data' => t('Post')),
+        array('data' => t('Address')),
+        array('data' => t('Actions'))
+    );
+
+    $query = db_query("SELECT m.crewman_id, m.name, m.address, m.post FROM {crewman} AS m,
+          {cruise_team} AS t, {cruise} AS c
+          WHERE c.cruise_id = :cid AND c.cruise_id = t.cruise_id AND t.crewman_id = m.crewman_id",
+        array("cid" => $cruise_crewteam));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('delete'), 'admin/config/content/fish_catch/cruise/crewman/' . $item->crewman_id . '/delete'),
             );
 
             $row [] = array(
