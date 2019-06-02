@@ -24,22 +24,63 @@ function fish_catch_menu()
 
     // список катеров
     $items['admin/config/content/fish_catch/list'] = array(
-        'title'  => 'Катеры',
+        'title'  => 'Рейсы',
         'type'   => MENU_DEFAULT_LOCAL_TASK,
         'weight' => 1,
     );
     // добавление рейса
-    $items['admin/config/content/fish_catch/passport/%passport_cruise/cruise'] = array(
+    $items['admin/config/content/fish_catch/%pass_cruise/passport_cruise_add'] = array(
         'title'            => 'Добавить рейс',
         'page callback'    => 'drupal_get_form',
-        'page arguments'   => array('fish_catch_passport_cruise_form', 5),
+        'page arguments'   => array('fish_catch_form', 4),
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_CALLBACK,
+    );
+    // редактирование рейса
+    $items['admin/config/content/fish_catch/%cruise_info/cruise_edit'] = array(
+        'title'            => 'Редактировать рейс',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_catch_cruise_form', 4),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // Удалить рейса
+    $items['admin/config/content/fish_catch/%cruise_info/cruise_delete'] = array(
+        'title'            => 'Удалить рейс',
+        'page callback'    => 'cruise_delete',
+        'page arguments'   => array(4),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // катеры
+    $items['admin/config/content/fish_catch/passport_list'] = array(
+        'title'            => 'Катеры',
+        'page callback'    => 'fish_passport_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 2,
     );
     // члены команды
     $items['admin/config/content/fish_catch/crewman/list'] = array(
         'title'            => 'Члены команды',
         'page callback'    => 'fish_crewman_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 3,
+    );
+    // члены команды
+    $items['admin/config/content/fish_catch/%cruise_crewteam/crewman_list'] = array(
+        'title'            => 'Члены команды',
+        'page arguments'   => array(4),
+        'page callback'    => 'fish_cruise_team_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // новый член команды
+    $items['admin/config/content/fish_catch/add_crewman'] = array(
+        'title'            => 'Новый член команды',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_crewman_form'),
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_LOCAL_TASK,
         'weight'           => 3,
@@ -79,8 +120,9 @@ function fish_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add cruise'), 'admin/config/content/fish_catch/passport/' . $item->passport_id . '/cruise'),
-                l(t('crewmans'), 'admin/config/content/fish_catch/cruise/' . $item->cruise_id . '/cruise_team'),
+                l(t('crewmans'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_team'),
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_edit'),
+                l(t('delete'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_delete'),
             );
 
             $date = date('d-m-Y', $item->release_date);
@@ -105,14 +147,14 @@ function fish_list()
 
 
 // добавление рейса
-function fish_catch_passport_cruise_form($form, &$form_state, $passport_cruise = null)
+function fish_catch_form($form, &$form_state, $pass_cruise = null)
 {
 
     $form['passport_id'] = array(
         '#title'         => t('Passport id'),
         '#description'   => t('Insert passport id'),
         '#type'          => 'textfield',
-        '#default_value' => $passport_cruise ? $passport_cruise : '',
+        '#default_value' => $pass_cruise ? $pass_cruise : '',
         '#required'      => true,
     );
     $form['release_date'] = array(
@@ -132,18 +174,18 @@ function fish_catch_passport_cruise_form($form, &$form_state, $passport_cruise =
 
     $form['submit'] = array(
         '#type'  => 'submit',
-        '#value' => $passport_cruise ? t('Save') : t('Add'),
+        '#value' => $pass_cruise ? t('Save') : t('Add'),
     );
 
     return $form;
 }
 
-function fish_catch_passport_cruise_form_validate($form, &$form_state)
+function fish_catch_form_validate($form, &$form_state)
 {
 
 }
 
-function fish_catch_passport_cruise_form_submit($form, &$form_state)
+function fish_catch_form_submit($form, &$form_state)
 {
     $addData = array(
         'passport_id' => $form_state['values']['passport_id'],
@@ -161,7 +203,10 @@ function fish_catch_passport_cruise_form_submit($form, &$form_state)
     drupal_goto('admin/config/content/fish_catch');
 }
 
+function pass_cruise_load($id) {
 
+    return $id;
+}
 
 
 // редактирование рейса
@@ -246,7 +291,56 @@ function cruise_info_load($id)
     return $cruise_info;
 }
 
+function cruise_delete($cruise_info)
+{
+    $rss_orders_deleted = db_delete('cruise')
+        ->condition('cruise_id', $cruise_info['cruise_id'])
+        ->execute();
+    drupal_set_message(t('Cruse deleted!'));
+    drupal_goto('admin/config/content/fish_catch');
+}
 
+
+
+// катеры
+function fish_passport_list()
+{
+    $header = array(
+        array('data' => t('Name')),
+        array('data' => t('Type')),
+        array('data' => t('Created at')),
+        array('data' => t('Water size')),
+        array('data' => t('Actions'))
+    );
+
+    $query = db_query("SELECT p.passport_id, p.name, p.type, p.created_at, p.water_size FROM {passport} AS p", array());
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('add cruise'), 'admin/config/content/fish_catch/' . $item->passport_id . '/passport_cruise_add'),
+            );
+
+            $date = date('d-m-Y', $item->created_at);
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->type),
+                array('data' => $date),
+                array('data' => $item->water_size),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
 
 
 
@@ -260,7 +354,7 @@ function fish_crewman_list()
         array('data' => t('Actions'))
     );
 
-    $query = db_query("SELECT * FROM {crewman}", array());
+    $query = db_query("SELECT m.crewman_id, m.name, m.post, m.address FROM {crewman} AS m", array());
     $result = $query->fetchAll();
 
     $row = array();
@@ -268,7 +362,8 @@ function fish_crewman_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add in cruiseteam'), 'admin/config/content/fish_catch/cruise_team/' . $item->crewman_id . '/crewman'),
+                l(t('add in cruiseteam'), 'admin/config/content/fish_catch/' . $item->crewman_id . '/add_crewman'),
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->crewman_id . '/edit'),
             );
 
             $row [] = array(
@@ -286,13 +381,79 @@ function fish_crewman_list()
     ));
 }
 
+// добавление члена команды
+function fish_crewman_form($form, &$form_state, $crewman_info = null)
+{
+
+    $form['name'] = array(
+        '#title'         => t('Name'),
+        '#description'   => t('Insert name'),
+        '#type'          => 'textfield',
+        '#default_value' => $crewman_info ? $crewman_info['name'] : '',
+        '#required'      => true,
+    );
+    $form['address'] = array(
+        '#title'         => t('Address'),
+        '#description'   => t('Insert address'),
+        '#type'          => 'textfield',
+        '#default_value' => $crewman_info ? $crewman_info['address'] : '',
+        '#required'      => true,
+    );
+    $form['post'] = array(
+        '#title'         => t('Post'),
+        '#description'   => t('Insert post'),
+        '#type'          => 'textfield',
+        '#default_value' => $crewman_info ? $crewman_info['post'] : '',
+        '#required'      => true,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => $crewman_info ? t('Save') : t('Add'),
+    );
+
+    return $form;
+}
+
+function fish_crewman_form_validate($form, &$form_state)
+{
+
+}
+
+function fish_crewman_form_submit($form, &$form_state)
+{
+    $addData = array(
+        'passport_id' => $form_state['values']['passport_id'],
+        'release_date' => $form_state['values']['release_date'],
+        'return_date' => $form_state['values']['return_date'],
+    );
+
+    // formating date to int
+    $addData['release_date'] = strtotime($addData['release_date']);
+    $addData['return_date'] = strtotime($addData['return_date']);
+
+    drupal_write_record('cruise', $addData);
+    drupal_set_message(t('cruise added!'));
+
+    drupal_goto('admin/config/content/fish_catch');
+}
+
+function crewman_info_load($id)
+{
+    $cruise_info = db_select('crewman', 'n')
+        ->fields('n', array('crewman_id', 'name', 'address', 'post'))
+        ->condition('n.crewman_id', $id)
+        ->execute()->fetchAssoc();
+
+    return $cruise_info;
+}
+
 
 
 
 // члены команды рейса
 function fish_cruise_team_list($cruise_crewteam)
 {
-    print_r($cruise_crewteam);
 
     $header = array(
         array('data' => t('Name')),
@@ -328,4 +489,9 @@ function fish_cruise_team_list($cruise_crewteam)
         'header' => $header,
         'rows'   => $row,
     ));
+}
+
+function cruise_crewteam_load($id) {
+
+    return $id;
 }
