@@ -58,9 +58,11 @@ function fish_catch_schema()
     // Команда рейса
     $schema['cruise_team'] = array(
         'fields'      => array(
+            'cruise_team_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
             'crewman_id'     => array('type' => 'int', 'not null' => TRUE),
             'cruise_id'       => array('type' => 'int', 'not null' => TRUE),
         ),
+        'primary key' => array('cruise_team_id')
     );
 
     // Банка
