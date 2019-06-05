@@ -68,7 +68,7 @@ function fish_catch_schema()
     // Банка
     $schema['bank'] = array(
         'fields'      => array(
-            'bank_id'     => array('type' => 'int', 'not null' => TRUE),
+            'bank_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
             'name'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
             'description'  => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
         ),
