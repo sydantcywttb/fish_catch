@@ -122,6 +122,14 @@ function fish_catch_menu()
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_CALLBACK,
     );
+    // добавить рыбу к рейсу
+    $items['admin/config/content/fish_catch/%cruise_info/fish_cruise_add'] = array(
+        'title'            => 'Рыба к рейсу',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_cruise_fish_add', 4),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
 
     // банки
     $items['admin/config/content/fish_catch/bank/list'] = array(
@@ -130,6 +138,14 @@ function fish_catch_menu()
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_LOCAL_TASK,
         'weight'           => 6,
+    );
+    // посещение банок
+    $items['admin/config/content/fish_catch/bank/list'] = array(
+        'title'            => 'Посещение банок',
+        'page callback'    => 'fish_bank_visit_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 11,
     );
     // новая банка
     $items['admin/config/content/fish_catch/add_bank'] = array(
@@ -148,11 +164,36 @@ function fish_catch_menu()
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_CALLBACK,
     );
+    // добавить посещение банки
+    $items['admin/config/content/fish_catch/add_bank_visit'] = array(
+        'title'            => 'Добавить посещение банки',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_bank_visit_form'),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 8,
+    );
     // сорта рыбы банки
     $items['admin/config/content/fish_catch/%fish_bank/fish_bank'] = array(
         'title'            => 'Сорта рыбы банки',
         'page arguments'   => array(4),
         'page callback'    => 'fish_bank_fish_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // улов выше среднего для банки
+    $items['admin/config/content/fish_catch/%fish_bank/fish_avg_bank'] = array(
+        'title'            => 'Катеры с уловом выше среднего',
+        'page arguments'   => array(4),
+        'page callback'    => 'fish_bank_avg_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // рейсы банки
+    $items['admin/config/content/fish_catch/%fish_bank/bank_cruise'] = array(
+        'title'            => 'Рейсы банки',
+        'page arguments'   => array(4),
+        'page callback'    => 'fish_bank_cruise_list',
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_CALLBACK,
     );
@@ -171,6 +212,31 @@ function fish_catch_menu()
         'access arguments' => array('administer site configuration'),
         'type'             => MENU_LOCAL_TASK,
         'weight'           => 8,
+    );
+    // рейсы по сорту рыбы
+    $items['admin/config/content/fish_catch/%sort_info/sort_cruise_list'] = array(
+        'title'            => 'Рейсы по сорту рыбы',
+        'page arguments'   => array(4),
+        'page callback'    => 'fish_sort_cruise_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_CALLBACK,
+    );
+    // новый сорт
+    $items['admin/config/content/fish_catch/add_sort'] = array(
+        'title'            => 'Новый сорт',
+        'page callback'    => 'drupal_get_form',
+        'page arguments'   => array('fish_sort_form'),
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 9,
+    );
+    // Поиск банок по интервалу с средним уловом
+    $items['admin/config/content/fish_catch/search_bank'] = array(
+        'title'            => 'Поиск банок',
+        'page callback'    => 'fish_search_bank_list',
+        'access arguments' => array('administer site configuration'),
+        'type'             => MENU_LOCAL_TASK,
+        'weight'           => 10,
     );
 
 
@@ -191,7 +257,7 @@ function fish_list()
 	);
 
     $query = db_query("SELECT c.cruise_id, c.passport_id, c.release_date, p.name, 
-          (SELECT COUNT(f.fish_id) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
+          (SELECT SUM(f.weight) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
           FROM {passport} AS p, {cruise} AS c WHERE p.passport_id = c.passport_id", array());
     $result = $query->fetchAll();
 
@@ -200,8 +266,8 @@ function fish_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add fish'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/add_fish'),
-                l(t('crewmans'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
+                l(t('Добавить рыбу'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/fish_cruise_add'),
+                l(t('Команда'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
                 l(t('edit'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_edit'),
                 l(t('delete'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_delete'),
             );
@@ -457,7 +523,7 @@ function fish_passport_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add cruise'), 'admin/config/content/fish_catch/' . $item->passport_id . '/passport_cruise_add'),
+                l(t('добавить рейс'), 'admin/config/content/fish_catch/' . $item->passport_id . '/passport_cruise_add'),
             );
 
             $date = date('d-m-Y', $item->created_at);
@@ -584,7 +650,7 @@ function fish_crewman_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add in cruiseteam'), 'admin/config/content/fish_catch/' . $item->crewman_id . '/crewteam_add'),
+                l(t('Добавить к рейсу'), 'admin/config/content/fish_catch/' . $item->crewman_id . '/crewteam_add'),
                 l(t('edit'), 'admin/config/content/fish_catch/' . $item->crewman_id . '/edit_crewman'),
             );
 
@@ -731,35 +797,38 @@ function fish_cruise_team_add($form, &$form_state, $cruise_crewteam = null)
 
     $info = db_select('cruise', 'n')
         ->fields('n', array('cruise_id'))
-        ->execute()->fetchAssoc();
+        ->execute()->fetchAll();
 
     $select_cruise = array();
 
+    $itemId = 0;
+
     foreach ($info as $item) {
-        array_push($select_cruise, "" . $item);
+        $itemId = $item->cruise_id;
+        $select_cruise[$item->cruise_id] = $item->cruise_id;
 
     }
+
 
     $form['cruise_id'] = array(
         '#type' => 'select',
         '#title' => t('Cruise id'),
         '#options' => $select_cruise,
-        '#default_value' => $select_cruise[0],
+        '#default_value' => $select_cruise[$itemId],
         '#description' => t('Set cruise id.'),
-    );
-
-    $form['crewman_id'] = array(
-        '#title'         => t('Crewman id'),
-        '#description'   => t('Insert crewman id'),
-        '#type'          => 'textfield',
-        '#default_value' => $cruise_crewteam ? $cruise_crewteam : '',
-        '#required'      => true,
     );
 
     $form['submit'] = array(
         '#type'  => 'submit',
         '#value' => $cruise_crewteam ? t('Save') : t('Add'),
     );
+
+    if ($cruise_crewteam) {
+        $form['crewman_id'] = array(
+            '#type'  => 'value',
+            '#value' => $cruise_crewteam,
+        );
+    }
 
     return $form;
 }
@@ -788,6 +857,60 @@ function cruise_crewteam_load($id) {
     return $id;
 }
 
+// добавление рыбы к рейсу
+function fish_cruise_fish_add($form, &$form_state, $cruise_info = null)
+{
+
+    $form['sort'] = array(
+        '#title'         => t('sort'),
+        '#description'   => t('Insert sort'),
+        '#type'          => 'textfield',
+        '#default_value' => '',
+        '#required'      => true,
+    );
+    $form['weight'] = array(
+        '#title'         => t('weight'),
+        '#description'   => t('Insert weight'),
+        '#type'          => 'textfield',
+        '#default_value' => '',
+        '#required'      => true,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => t('Save'),
+    );
+
+
+    if ($cruise_info) {
+        $form['cruise_id'] = array(
+            '#type'  => 'value',
+            '#value' => $cruise_info['cruise_id'],
+        );
+    }
+
+    return $form;
+}
+
+function fish_cruise_fish_add_validate($form, &$form_state)
+{
+
+}
+
+function fish_cruise_fish_add_submit($form, &$form_state)
+{
+    $addData = array(
+        'sort' => $form_state['values']['sort'],
+        'weight' => $form_state['values']['weight'],
+        'cruise_id' => $form_state['values']['cruise_id'],
+    );
+
+
+    drupal_write_record('fish', $addData);
+    drupal_set_message(t('fish added!'));
+
+    drupal_goto('admin/config/content/fish_catch');
+}
 
 
 // банки
@@ -807,7 +930,9 @@ function fish_bank_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('cruises'), 'admin/config/content/fish_catch/' . $item->bank_id . '/fish_bank'),
+                l(t('улов > среднего'), 'admin/config/content/fish_catch/' . $item->bank_id . '/fish_avg_bank'),
+                l(t('рейсу по сорту рыбы'), 'admin/config/content/fish_catch/' . $item->bank_id . '/fish_bank'),
+                l(t('рейсы'), 'admin/config/content/fish_catch/' . $item->bank_id . '/bank_cruise'),
                 l(t('edit'), 'admin/config/content/fish_catch/' . $item->bank_id . '/edit_bank'),
             );
 
@@ -896,6 +1021,223 @@ function bank_info_load($id)
     return $cruise_info;
 }
 
+
+// посещение банок
+function fish_bank_visit_list()
+{
+    $header = array(
+        array('data' => t('Название')),
+        array('data' => t('Дата прибытия')),
+        array('data' => t('Дата отплыва')),
+        array('data' => t('Качество рыбы')),
+        array('data' => t('Рейс №')),
+        array('data' => t('Actions'))
+    );
+
+    $query = db_query("SELECT bv.visit_id, b.bank_id, b.name, bv.arrival_date, bv.departure_date,
+            bv.quality, bv.cruise_id 
+            FROM {bank} AS b, {bank_visit} AS bv WHERE b.bank_id = bv.bank_id
+            ORDER BY bv.visit_id", array());
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->visit_id . '/edit_bank_visit'),
+            );
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->arrival_date),
+                array('data' => $item->departure_date),
+                array('data' => $item->quality),
+                array('data' => $item->cruise_id),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
+// добавление посещения банки
+function fish_bank_visit_form($form, &$form_state, $bank_visit_info = null)
+{
+
+    $info = db_select('cruise', 'n')
+        ->fields('n', array('cruise_id'))
+        ->execute()->fetchAll();
+
+    $select_cruise = array();
+
+    $itemId = 0;
+
+    foreach ($info as $item) {
+        $itemId = $item->cruise_id;
+        $select_cruise[$item->cruise_id] = $item->cruise_id;
+
+    }
+
+    $form['cruise_id'] = array(
+        '#type' => 'select',
+        '#title' => t('Cruise id'),
+        '#options' => $select_cruise,
+        '#default_value' => $select_cruise[$itemId],
+        '#description' => t('Set cruise id.'),
+    );
+
+
+    $infoBank = db_select('bank', 'n')
+        ->fields('n', array('bank_id', 'name'))
+        ->execute()->fetchAll();
+
+    $select_bank = array();
+
+    $itemBankId = 0;
+
+    foreach ($infoBank as $item) {
+        $itemBankId = $item->bank_id;
+        $select_bank[$item->bank_id] = $item->name;
+    }
+
+    $form['bank_id'] = array(
+        '#type' => 'select',
+        '#title' => t('Bank id'),
+        '#options' => $select_bank,
+        '#default_value' => $select_bank[$itemBankId],
+        '#description' => t('Set bank id.'),
+    );
+
+    $form['arrival_date'] = array(
+        '#title'         => t('Arrival date'),
+        '#description'   => t('Arrival date 22-03-2018'),
+        '#type'          => 'textfield',
+        '#default_value' => $bank_visit_info ? date('d-m-Y', $bank_visit_info['arrival_date']) : '',
+        '#required'      => true,
+    );
+    $form['departure_date'] = array(
+        '#title'         => t('Departure date'),
+        '#description'   => t('Departure date 22-03-2018'),
+        '#type'          => 'textfield',
+        '#default_value' => $bank_visit_info ? date('d-m-Y', $bank_visit_info['departure_date']) : '',
+        '#required'      => true,
+    );
+    $form['quality'] = array(
+        '#title'         => t('Качество'),
+        '#description'   => t('Insert quality'),
+        '#type'          => 'textfield',
+        '#default_value' => $bank_visit_info ? $bank_visit_info['quality'] : '',
+        '#required'      => true,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => $bank_visit_info ? t('Save') : t('Add'),
+    );
+
+    if ($bank_visit_info) {
+        $form['visit_id'] = array(
+            '#type'  => 'value',
+            '#value' => $bank_visit_info['visit_id'],
+        );
+    }
+    return $form;
+}
+
+function fish_bank_visit_form_validate($form, &$form_state)
+{
+
+}
+
+function fish_bank_visit_form_submit($form, &$form_state)
+{
+    $addData = array(
+        'cruise_id' => $form_state['values']['cruise_id'],
+        'bank_id' => $form_state['values']['bank_id'],
+        'arrival_date' => $form_state['values']['arrival_date'],
+        'departure_date' => $form_state['values']['departure_date'],
+        'quality' => $form_state['values']['quality'],
+    );
+
+    // formating date to int
+    $addData['arrival_date'] = strtotime($addData['arrival_date']);
+    $addData['departure_date'] = strtotime($addData['departure_date']);
+
+    // save edit data
+    if (isset($form_state['values']['visit_id'])) {
+        $addData['visit_id'] = $form_state['values']['visit_id'];
+            drupal_write_record('bank_visit', $addData, 'visit_id');
+        drupal_set_message(t('bank_visit saved!'));
+    } // add new data
+    else {
+        drupal_write_record('bank_visit', $addData);
+        drupal_set_message(t('bank_visit added!'));
+    }
+
+    drupal_goto('admin/config/content/fish_catch/');
+}
+
+function bank_visit_info_load($id)
+{
+    $cruise_info = db_select('bank_visit', 'n')
+        ->fields('n', array('visit_id', 'cruise_id', 'bank_id', 'arrival_date', 'departure_date', 'quality'))
+        ->condition('n.visit_id', $id)
+        ->execute()->fetchAssoc();
+
+    return $cruise_info;
+}
+
+
+// рейсы банки
+function fish_bank_cruise_list($fish_bank)
+{
+
+    $header = array(
+        array('data' => t('Name')),
+        array('data' => t('Release_date')),
+        array('data' => t('Fishes')),
+        array('data' => t('Actions')),
+    );
+
+    $query = db_query("SELECT c.cruise_id, c.passport_id, c.release_date, p.name, 
+          (SELECT SUM(f.weight) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
+          FROM {passport} AS p, {cruise} AS c, {bank} AS b, {bank_visit} AS bv
+           WHERE p.passport_id = c.passport_id AND b.bank_id = bv.bank_id AND bv.cruise_id = c.cruise_id
+            AND b.bank_id = :bid", array("bid" => $fish_bank));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('Добавить рыбу'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/fish_cruise_add'),
+                l(t('Команда'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_edit'),
+                l(t('delete'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_delete'),
+            );
+
+            $date = date('d-m-Y', $item->release_date);
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $date),
+                array('data' => $item->count),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
 // сорта рыбы банки
 function fish_bank_fish_list($fish_bank)
 {
@@ -930,6 +1272,90 @@ function fish_bank_fish_list($fish_bank)
     ));
 }
 
+
+// сорта рыбы рейса
+function fish_cruise_fish_list($cruise_info)
+{
+
+    $header = array(
+        array('data' => t('Сорт')),
+        array('data' => t('Actions'))
+    );
+
+    $query = db_query("SELECT f.sort FROM {fish} AS f, {cruise} AS c
+              WHERE c.cruise_id = f.cruise_id AND c.cruise_id = :cid GROUP BY f.sort",
+        array("cid" => $cruise_info['cruise_id']));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->fish_id . '/fish_edit'),
+            );
+
+            $row [] = array(
+                array('data' => $item->sort),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
+// катеры с уловом выше среднего
+function fish_bank_avg_list($fish_bank)
+{
+
+    $header = array(
+        array('data' => t('Название')),
+        array('data' => t('Улов')),
+        array('data' => t('Actions'))
+    );
+
+    $query = db_query("SELECT p.name, SUM(f.weight) AS count 
+          FROM {bank_visit} AS bv, 
+            {cruise} AS c, {passport} AS p, {fish} AS f WHERE 
+             bv.cruise_id = c.cruise_id AND c.passport_id = p.passport_id 
+             AND f.weight > (
+              SELECT AVG(f.weight) FROM {fish} AS ff, {cruise} AS cc,
+              {bank_visit} AS bvbv 
+              WHERE cc.cruise_id = bvbv.cruise_id AND bvbv.bank_id = :bid 
+                AND ff.cruise_id = cc.cruise_id
+              ) 
+            AND f.cruise_id = c.cruise_id AND bv.bank_id = :bid 
+             GROUP BY p.passport_id, f.sort 
+             ORDER BY p.passport_id DESC",
+        array("bid" => $fish_bank));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->passport_id . '/edit_passport'),
+            );
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->count),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
 function fish_bank_load($id) {
     return $id;
 }
@@ -945,10 +1371,12 @@ function fish_bank_sort_cruise_list($fish_bank, $sort_info) {
         array('data' => t('Actions')),
     );
 
-    $query = db_query("SELECT c.cruise_id, c.passport_id, c.release_date, p.name, 
+    $query = db_query("SELECT c.cruise_id, c.release_date, p.name, 
           (SELECT COUNT(f.fish_id) AS count FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
-          FROM {passport} AS p, {cruise} AS c, {fish} AS f, {bank} AS b WHERE p.passport_id = c.passport_id,
-          f.cruise_id = c.cruise_id, f.sort = :sort_name, b.bank_id = :bid",
+          FROM {passport} AS p, {cruise} AS c, {fish} AS f, {bank} AS b, {bank_visit} AS bv
+           WHERE p.passport_id = c.passport_id AND bv.bank_id = b.bank_id AND bv.cruise_id = c.cruise_id 
+          AND 
+          f.cruise_id = c.cruise_id AND f.sort = :sort_name AND b.bank_id = :bid",
         array("bid" => $fish_bank, "sort_name" => $sort_info));
     $result = $query->fetchAll();
 
@@ -957,8 +1385,8 @@ function fish_bank_sort_cruise_list($fish_bank, $sort_info) {
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('add fish'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/add_fish'),
-                l(t('crewmans'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
+                l(t('добавить рыбу'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/add_fish'),
+                l(t('команда'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
                 l(t('edit'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_edit'),
                 l(t('delete'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_delete'),
             );
@@ -991,11 +1419,12 @@ function fish_catch_list()
 
     $header = array(
         array('data' => t('Сорт')),
-        array('data' => t('Вес')),
         array('data' => t('Actions'))
     );
 
-    $query = db_query("SELECT f.sort, f.weight from {fish} AS f GROUP BY f.sort",
+    $query = db_query("SELECT fs.sort_id, fs.name FROM {fish_sort} AS fs 
+        GROUP BY fs.sort_id 
+        ORDER BY fs.sort_id DESC",
         array());
     $result = $query->fetchAll();
 
@@ -1004,13 +1433,164 @@ function fish_catch_list()
     if($result) {
         foreach ($result as $item) {
             $actions = array(
-                l(t('список рейсов'), 'admin/config/content/fish_catch/' . $item->sort . '/fish_cruise'),
+                l(t('список рейсов'), 'admin/config/content/fish_catch/' . $item->sort_id . '/sort_cruise_list'),
             );
 
             $row [] = array(
-                array('data' => $item->sort),
-                array('data' => $item->weight),
+                array('data' => $item->name),
                 array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
+// список рейсов по сорту
+function fish_sort_cruise_list($sort_info) {
+
+    $header = array(
+        array('data' => t('Name')),
+        array('data' => t('Дата выхода')),
+        array('data' => t('Дата возвращения')),
+        array('data' => t('Улов')),
+        array('data' => t('Actions')),
+    );
+
+    $query = db_query("SELECT c.cruise_id, c.passport_id, c.release_date, c.return_date, p.name, 
+          (SELECT SUM(f.weight) FROM {fish} AS f WHERE f.cruise_id = c.cruise_id) AS count
+          FROM {passport} AS p, {cruise} AS c, {fish} AS f 
+           WHERE p.passport_id = c.passport_id AND 
+          f.cruise_id = c.cruise_id AND f.sort = :sort_name",
+        array("sort_name" => $sort_info));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+            $actions = array(
+                l(t('добавить рыбу'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/add_fish'),
+                l(t('команда'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/crewman_list'),
+                l(t('edit'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_edit'),
+                l(t('delete'), 'admin/config/content/fish_catch/' . $item->cruise_id . '/cruise_delete'),
+            );
+
+            $date = date('d-m-Y', $item->release_date);
+            $dateReturn = date('d-m-Y', $item->return_date);
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $date),
+                array('data' => $dateReturn),
+                array('data' => $item->count),
+                array('data' => implode(' | ', $actions)),
+            );
+        }
+    }
+
+    return theme('table', array(
+        'header' => $header,
+        'rows'   => $row,
+    ));
+}
+
+// добавление сорта
+function fish_sort_form($form, &$form_state, $sort_fish_info = null)
+{
+
+    $form['name'] = array(
+        '#title'         => t('Name'),
+        '#description'   => t('Insert name'),
+        '#type'          => 'textfield',
+        '#default_value' => $sort_fish_info ? $sort_fish_info['name'] : '',
+        '#required'      => true,
+    );
+
+    $form['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => $sort_fish_info ? t('Save') : t('Add'),
+    );
+
+    if ($sort_fish_info) {
+        $form['sort_id'] = array(
+            '#type'  => 'value',
+            '#value' => $sort_fish_info['sort_id'],
+        );
+    }
+    return $form;
+}
+
+function fish_sort_form_validate($form, &$form_state)
+{
+
+}
+
+function fish_sort_form_submit($form, &$form_state)
+{
+    $addData = array(
+        'name' => $form_state['values']['name'],
+    );
+
+    // save edit data
+    if (isset($form_state['values']['sort_id'])) {
+        $addData['sort_id'] = $form_state['values']['sort_id'];
+        drupal_write_record('fish_sort', $addData, 'sort_id');
+        drupal_set_message(t('fish_sort saved!'));
+    } // add new data
+    else {
+        drupal_write_record('fish_sort', $addData);
+        drupal_set_message(t('fish_sort added!'));
+    }
+
+    drupal_goto('admin/config/content/fish_catch/fish_list');
+}
+
+function sort_fish_info_load($id)
+{
+    $cruise_info = db_select('fish_sort', 'n')
+        ->fields('n', array('sort_id', 'name'))
+        ->condition('n.sort_id', $id)
+        ->execute()->fetchAssoc();
+
+    return $cruise_info;
+}
+
+
+// банки с средним уловом по датам
+function fish_search_bank_list()
+{
+    $dateOne = '22-01-2018';
+    $dateTwo = '24-05-2019';
+
+    $timeOne = strtotime($dateOne);
+    $timeTwo = strtotime($dateTwo);
+
+
+    $header = array(
+        array('data' => t('Название')),
+        array('data' => t('Средний улов'))
+    );
+
+    $query = db_query("SELECT b.name, (
+              SELECT AVG(ff.weight) FROM {fish} AS ff, {cruise} AS cc, 
+                {bank_visit} AS bvbv 
+                WHERE bvbv.cruise_id = cc.cruise_id AND ff.cruise_id = cc.cruise_id
+            ) AS count FROM {bank} AS b, {bank_visit} AS bv 
+            WHERE (bv.arrival_date BETWEEN :tone AND :ttwo) AND bv.bank_id = b.bank_id GROUP BY bv.bank_id",
+        array("tone" => $timeOne, "ttwo" => $timeTwo));
+    $result = $query->fetchAll();
+
+    $row = array();
+
+    if($result) {
+        foreach ($result as $item) {
+
+            $row [] = array(
+                array('data' => $item->name),
+                array('data' => $item->count),
             );
         }
     }

@@ -37,11 +37,19 @@ function fish_catch_schema()
     $schema['fish'] = array(
         'fields'      => array(
             'fish_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
-            'sort'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+            'sort'       => array('type' => 'int', 'not null' => TRUE),
             'weight' => array('type' => 'int', 'not null' => TRUE),
             'cruise_id' => array('type' => 'int', 'not null' => TRUE),
         ),
         'primary key' => array('fish_id')
+    );
+    // Сорта рыбы
+    $schema['fish_sort'] = array(
+        'fields'      => array(
+            'sort_id'     => array('type' => 'serial',  'size'=>'normal',  'not null' => TRUE),
+            'name'       => array('type' => 'varchar', 'length' => 255, 'not null' => TRUE),
+        ),
+        'primary key' => array('sort_id')
     );
 
     // Член команды
